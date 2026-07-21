@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#020617" />
+  <title>Misión de Seguridad Digital</title>
+  <style>
+    :root {
+      --bg: #020617;
+      --panel: rgba(5, 14, 30, 0.92);
+      --line: rgba(45, 212, 191, 0.26);
+      --cyan: #5eead4;
+      --cyan2: #22d3ee;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --danger: #ef4444;
+      --warning: #facc15;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      overflow-x: hidden;
+    }
+
+    body {
+      min-height: 100dvh;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(34, 211, 238, 0.15), transparent 32%),
+        radial-gradient(circle at 85% 90%, rgba(79, 70, 229, 0.18), transparent 35%),
+        linear-gradient(145deg, #020617, #071321 55%, #020617);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .16;
+      background-image:
+        linear-gradient(rgba(94, 234, 212, .12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(94, 234, 212, .12) 1px, transparent 1px);
+      background-size: 34px 34px;
+      mask-image: linear-gradient(to bottom, black, transparent 85%);
+    }
+
+    .app {
+      min-height: 100dvh;
+      width: 100%;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      position: relative;
+      isolation: isolate;
+    }
+
+    .screen {
+      display: none;
+      width: min(900px, 100%);
+      min-height: min(760px, calc(100dvh - 36px));
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: var(--panel);
+      box-shadow: 0 30px 100px rgba(0,0,0,.55), 0 0 50px rgba(34,211,238,.08);
+      padding: clamp(20px, 4vw, 40px);
+      overflow: hidden;
+      position: relative;
+      backdrop-filter: blur(14px);
+    }
+
+    .screen.active {
+      display: flex;
+      flex-direction: column;
+      animation: fadeIn .45s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px) scale(.99); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 22px;
+      font-family: "Courier New", monospace;
+    }
+
+    .brand {
+      color: var(--cyan);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 2.2px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #34d399;
+      box-shadow: 0 0 14px #34d399;
+      animation: blink 1.2s infinite;
+    }
+
+    @keyframes blink { 50% { opacity: .35; } }
+
+    .hero {
+      flex: 1;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      text-align: center;
+      padding: 10px 0 24px;
+    }
+
+    .gift {
+      width: 104px;
+      height: 104px;
+      display: grid;
+      place-items: center;
+      border-radius: 28px;
+      font-size: 52px;
+      background: linear-gradient(145deg, #14b8a6, #4f46e5);
+      box-shadow: 0 0 45px rgba(45,212,191,.28);
+      transform: rotate(-3deg);
+      margin-bottom: 22px;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(38px, 8vw, 76px);
+      line-height: .98;
+      letter-spacing: -2.5px;
+      font-weight: 1000;
+    }
+
+    .accent {
+      color: var(--cyan);
+      text-shadow: 0 0 26px rgba(94,234,212,.22);
+    }
+
+    .subtitle {
+      max-width: 680px;
+      margin: 22px auto 0;
+      color: #cbd5e1;
+      font-size: clamp(16px, 3vw, 21px);
+      line-height: 1.55;
+    }
+
+    .games {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 12px;
+      width: min(720px,100%);
+      margin: 28px auto;
+    }
+
+    .game {
+      min-height: 92px;
+      display: grid;
+      place-items: center;
+      gap: 5px;
+      padding: 14px;
+      border: 1px solid rgba(148,163,184,.18);
+      border-radius: 18px;
+      background: rgba(15,23,42,.78);
+    }
+
+    .game span { font-size: 28px; }
+    .game strong { font-size: 13px; letter-spacing: .7px; }
+
+    .primary-btn {
+      width: min(440px,100%);
+      min-height: 58px;
+      border: 0;
+      border-radius: 16px;
+      background: linear-gradient(90deg, var(--cyan), #2dd4bf);
+      color: #031311;
+      font-weight: 1000;
+      font-size: 17px;
+      letter-spacing: .6px;
+      cursor: pointer;
+      box-shadow: 0 14px 40px rgba(45,212,191,.26);
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+
+    .primary-btn:hover { transform: translateY(-2px); box-shadow: 0 18px 48px rgba(45,212,191,.36); }
+    .primary-btn:active { transform: scale(.98); }
+
+    .tiny {
+      margin-top: 16px;
+      color: #64748b;
+      font-size: 10px;
+      letter-spacing: .5px;
+    }
+
+    .terminal-title {
+      margin: 4px 0 8px;
+      color: var(--cyan);
+      font-family: "Courier New", monospace;
+      font-size: clamp(25px, 5vw, 42px);
+      letter-spacing: .8px;
+    }
+
+    .terminal-subtitle {
+      color: #64748b;
+      font-family: "Courier New", monospace;
+      font-size: 12px;
+      margin-bottom: 22px;
+    }
+
+    .terminal {
+      flex: 1;
+      padding: clamp(16px,3vw,25px);
+      border: 1px solid rgba(34,211,238,.18);
+      border-radius: 20px;
+      background:
+        linear-gradient(rgba(2,6,23,.9), rgba(2,6,23,.97)),
+        repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(94,234,212,.03) 4px);
+      box-shadow: inset 0 0 40px rgba(0,0,0,.55);
+      overflow: hidden;
+    }
+
+    .terminal-line {
+      min-height: 22px;
+      margin-bottom: 14px;
+      color: #34d399;
+      font-family: "Courier New", monospace;
+      font-size: clamp(11px,2.6vw,14px);
+    }
+
+    .scan-row {
+      display: none;
+      margin-bottom: 20px;
+      animation: rowIn .3s ease;
+    }
+
+    .scan-row.visible { display: block; }
+
+    @keyframes rowIn {
+      from { opacity: 0; transform: translateX(-10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .scan-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12px;
+      margin-bottom: 8px;
+      color: #e2e8f0;
+      font-family: "Courier New", monospace;
+      font-size: clamp(11px,2.8vw,15px);
+      font-weight: 700;
+    }
+
+    .pct { color: var(--cyan); min-width: 44px; text-align: right; }
+
+    .track {
+      height: 13px;
+      overflow: hidden;
+      border: 1px solid rgba(94,234,212,.22);
+      border-radius: 999px;
+      background: #07101d;
+    }
+
+    .bar {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: repeating-linear-gradient(90deg, #2dd4bf 0 12px, #67e8f9 12px 16px);
+      box-shadow: 0 0 18px rgba(45,212,191,.65);
+      transition: width .1s linear;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .bar::after {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 -70px;
+      width: 70px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent);
+      animation: shine .7s linear infinite;
+    }
+
+    @keyframes shine { to { transform: translateX(800px); } }
+
+    .overall {
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(148,163,184,.13);
+    }
+
+    .overall-label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      color: #64748b;
+      font-family: "Courier New", monospace;
+      font-size: 11px;
+    }
+
+    #final-screen {
+      border-color: rgba(248,113,113,.38);
+      background:
+        radial-gradient(circle at 50% 0%, rgba(220,38,38,.22), transparent 36%),
+        rgba(7,10,19,.97);
+    }
+
+    .alert {
+      flex: 1;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .alert-icon {
+      width: 108px;
+      height: 108px;
+      display: grid;
+      place-items: center;
+      border: 2px solid #f87171;
+      border-radius: 50%;
+      background: rgba(127,29,29,.34);
+      color: #fecaca;
+      font-size: 54px;
+      font-weight: 1000;
+      box-shadow: 0 0 48px rgba(248,113,113,.28);
+      animation: pulseDanger .75s infinite alternate;
+    }
+
+    @keyframes pulseDanger { to { transform: scale(1.055); box-shadow: 0 0 70px rgba(248,113,113,.42); } }
+
+    .alert h2 {
+      margin: 18px 0 8px;
+      color: #f87171;
+      font-size: clamp(48px,10vw,92px);
+      line-height: .95;
+      letter-spacing: 2px;
+    }
+
+    .alert-message {
+      max-width: 760px;
+      font-size: clamp(20px,4.2vw,31px);
+      line-height: 1.3;
+      font-weight: 900;
+    }
+
+    .lesson-box {
+      width: min(760px,100%);
+      margin: 26px auto 0;
+      padding: 20px;
+      border: 1px solid rgba(248,113,113,.28);
+      border-radius: 18px;
+      background: rgba(69,10,10,.24);
+      text-align: left;
+    }
+
+    .lesson {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin: 12px 0;
+      color: #e2e8f0;
+      font-size: clamp(14px,3vw,17px);
+      line-height: 1.45;
+    }
+
+    .num {
+      flex: 0 0 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(220,38,38,.35);
+      color: #fecaca;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .safe {
+      width: min(760px,100%);
+      margin-top: 20px;
+      padding: 16px;
+      border: 1px solid rgba(52,211,153,.28);
+      border-radius: 14px;
+      background: rgba(6,78,59,.2);
+      color: #a7f3d0;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .final-phrase {
+      margin-top: 20px;
+      color: var(--cyan);
+      font-size: clamp(17px,3.7vw,25px);
+      font-weight: 1000;
+    }
+
+    .secondary-btn {
+      margin-top: 20px;
+      min-height: 46px;
+      padding: 0 22px;
+      border: 1px solid rgba(94,234,212,.36);
+      border-radius: 12px;
+      background: transparent;
+      color: var(--cyan);
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .shake { animation: shake .18s linear 5; }
+
+    @keyframes shake {
+      0%,100% { transform: translate(0); }
+      25% { transform: translate(-4px,2px); }
+      50% { transform: translate(4px,-2px); }
+      75% { transform: translate(-3px,-1px); }
+    }
+
+    @media (max-width: 640px) {
+      .app { padding: 0; }
+      .screen {
+        min-height: 100dvh;
+        border-radius: 0;
+        border-left: 0;
+        border-right: 0;
+        padding: 18px 15px;
+      }
+      .games { grid-template-columns: 1fr; gap: 8px; margin: 22px auto; }
+      .game { min-height: 56px; grid-template-columns: auto 1fr; justify-content: center; }
+      .game span { font-size: 22px; }
+      h1 { letter-spacing: -1.7px; }
+      .status { font-size: 9px; }
+      .brand { font-size: 10px; }
+      .terminal { padding: 14px; }
+      .scan-row { margin-bottom: 18px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" id="app">
+    <section class="screen active" id="start-screen">
+      <div class="topbar">
+        <div class="brand">GAMING BONUS CENTER</div>
+        <div class="status"><span class="status-dot"></span>SISTEMA ACTIVO</div>
+      </div>
+
+      <div class="hero">
+        <div class="gift">🎁</div>
+        <h1>¡RECOMPENSA <span class="accent">ESPECIAL</span> DISPONIBLE!</h1>
+        <p class="subtitle">Tu dispositivo fue seleccionado para participar en una experiencia especial de recompensas para jugadores.</p>
+
+        <div class="games">
+          <div class="game"><span>🧱</span><strong>ROBLOX</strong></div>
+          <div class="game"><span>🎯</span><strong>CALL OF DUTY</strong></div>
+          <div class="game"><span>🔥</span><strong>FREE FIRE</strong></div>
+        </div>
+
+        <button class="primary-btn" id="start-btn" type="button">RECLAMAR RECOMPENSA</button>
+        <div class="tiny">EXPERIENCIA INTERACTIVA • NO SOLICITA CONTRASEÑAS</div>
+      </div>
+    </section>
+
+    <section class="screen" id="scan-screen">
+      <div class="topbar">
+        <div class="brand">DIGITAL ANALYSIS TERMINAL</div>
+        <div class="status"><span class="status-dot"></span>PROCESANDO</div>
+      </div>
+
+      <h2 class="terminal-title">ANÁLISIS EN CURSO...</h2>
+      <div class="terminal-subtitle">Secuencia automatizada de verificación digital</div>
+
+      <div class="terminal">
+        <div class="terminal-line" id="terminal-line">&gt; Inicializando sistema...</div>
+
+        <div class="scan-row" id="row-1">
+          <div class="scan-label"><span>Analizando exposición relacionada con ROBLOX...</span><span class="pct" id="pct-1">0%</span></div>
+          <div class="track"><div class="bar" id="bar-1"></div></div>
+        </div>
+
+        <div class="scan-row" id="row-2">
+          <div class="scan-label"><span>Analizando exposición relacionada con CALL OF DUTY...</span><span class="pct" id="pct-2">0%</span></div>
+          <div class="track"><div class="bar" id="bar-2"></div></div>
+        </div>
+
+        <div class="scan-row" id="row-3">
+          <div class="scan-label"><span>Analizando exposición relacionada con FREE FIRE...</span><span class="pct" id="pct-3">0%</span></div>
+          <div class="track"><div class="bar" id="bar-3"></div></div>
+        </div>
+
+        <div class="scan-row" id="row-4">
+          <div class="scan-label"><span>Verificando posibles riesgos asociados a WHATSAPP...</span><span class="pct" id="pct-4">0%</span></div>
+          <div class="track"><div class="bar" id="bar-4"></div></div>
+        </div>
+
+        <div class="scan-row" id="row-5">
+          <div class="scan-label"><span>Buscando señales de ingeniería social...</span><span class="pct" id="pct-5">0%</span></div>
+          <div class="track"><div class="bar" id="bar-5"></div></div>
+        </div>
+
+        <div class="overall">
+          <div class="overall-label"><span>PROGRESO GENERAL</span><span id="overall-pct">0%</span></div>
+          <div class="track"><div class="bar" id="overall-bar"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="final-screen">
+      <div class="topbar">
+        <div class="brand">MISIÓN DE SEGURIDAD DIGITAL</div>
+        <div class="status">DEMOSTRACIÓN FINALIZADA</div>
+      </div>
+
+      <div class="alert">
+        <div class="alert-icon">!</div>
+        <h2>¡DETENTE!</h2>
+        <div class="alert-message">NO FUISTE HACKEADO.<br>ESTO FUE UNA SIMULACIÓN EDUCATIVA.</div>
+
+        <div class="lesson-box">
+          <div class="lesson"><span class="num">1</span><span>Escaneaste un código QR sin verificar su procedencia.</span></div>
+          <div class="lesson"><span class="num">2</span><span>Confiabas en una recompensa demasiado buena para ser cierta.</span></div>
+          <div class="lesson"><span class="num">3</span><span>Entraste a un sitio sin comprobar cuidadosamente su dirección.</span></div>
+          <div class="lesson"><span class="num">4</span><span>Presionaste “Reclamar recompensa” sin saber lo que ocurriría después.</span></div>
+        </div>
+
+        <div class="safe"><strong>TU INFORMACIÓN NO FUE ROBADA.</strong><br>No se accedió a cuentas, mensajes, cámara, micrófono ni archivos. Las barras fueron únicamente una animación ejecutada dentro de esta página.</div>
+        <div class="final-phrase">EL CONOCIMIENTO ES LA LLAVE PARA GANARLES A LOS HACKERS.</div>
+        <button class="secondary-btn" id="restart-btn" type="button">REPETIR DEMOSTRACIÓN</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const app = document.getElementById("app");
+      const startScreen = document.getElementById("start-screen");
+      const scanScreen = document.getElementById("scan-screen");
+      const finalScreen = document.getElementById("final-screen");
+      const startBtn = document.getElementById("start-btn");
+      const restartBtn = document.getElementById("restart-btn");
+      const terminalLine = document.getElementById("terminal-line");
+      const overallBar = document.getElementById("overall-bar");
+      const overallPct = document.getElementById("overall-pct");
+
+      let running = false;
+
+      const scans = [
+        { row: "row-1", bar: "bar-1", pct: "pct-1", start: "> Conectando con módulo de análisis gamer...", end: "> Análisis relacionado con ROBLOX completado." },
+        { row: "row-2", bar: "bar-2", pct: "pct-2", start: "> Verificando patrones de interacción...", end: "> Análisis relacionado con CALL OF DUTY completado." },
+        { row: "row-3", bar: "bar-3", pct: "pct-3", start: "> Procesando señales digitales visibles...", end: "> Análisis relacionado con FREE FIRE completado." },
+        { row: "row-4", bar: "bar-4", pct: "pct-4", start: "> Comprobando riesgos comunes de mensajería...", end: "> Verificación de riesgos asociados a WHATSAPP completada." },
+        { row: "row-5", bar: "bar-5", pct: "pct-5", start: "> Comparando decisiones con técnicas de engaño...", end: "> Señales de ingeniería social identificadas." }
+      ];
+
+      function show(screen) {
+        [startScreen, scanScreen, finalScreen].forEach(s => s.classList.remove("active"));
+        screen.classList.add("active");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      function reset() {
+        running = false;
+        scans.forEach(scan => {
+          document.getElementById(scan.row).classList.remove("visible");
+          document.getElementById(scan.bar).style.width = "0%";
+          document.getElementById(scan.pct).textContent = "0%";
+        });
+        overallBar.style.width = "0%";
+        overallPct.textContent = "0%";
+        terminalLine.textContent = "> Inicializando sistema...";
+        app.classList.remove("shake");
+        show(startScreen);
+      }
+
+      function animate(scan, index, done) {
+        const row = document.getElementById(scan.row);
+        const bar = document.getElementById(scan.bar);
+        const pct = document.getElementById(scan.pct);
+        let value = 0;
+
+        row.classList.add("visible");
+        terminalLine.textContent = scan.start;
+
+        const timer = setInterval(() => {
+          value = Math.min(value + Math.floor(Math.random() * 7) + 2, 100);
+          bar.style.width = value + "%";
+          pct.textContent = value + "%";
+
+          const total = Math.floor(((index * 100) + value) / scans.length);
+          overallBar.style.width = total + "%";
+          overallPct.textContent = total + "%";
+
+          if (value >= 100) {
+            clearInterval(timer);
+            terminalLine.textContent = scan.end;
+            setTimeout(done, 500);
+          }
+        }, 70);
+      }
+
+      function run(index) {
+        if (index >= scans.length) {
+          overallBar.style.width = "99%";
+          overallPct.textContent = "99%";
+          terminalLine.textContent = "> Generando resultado final...";
+          app.classList.add("shake");
+
+          setTimeout(() => {
+            overallBar.style.width = "100%";
+            overallPct.textContent = "100%";
+            app.classList.remove("shake");
+            show(finalScreen);
+            running = false;
+          }, 1600);
+          return;
+        }
+
+        animate(scans[index], index, () => run(index + 1));
+      }
+
+      startBtn.addEventListener("click", () => {
+        if (running) return;
+        running = true;
+        show(scanScreen);
+        setTimeout(() => {
+          terminalLine.textContent = "> Conexión establecida. Iniciando análisis...";
+          run(0);
+        }, 650);
+      });
+
+      restartBtn.addEventListener("click", reset);
+    })();
+  </script>
+</body>
+</html>
