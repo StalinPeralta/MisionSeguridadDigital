@@ -12,7 +12,17 @@ const firebaseConfig = {
 };
 
 const CAMPAIGN_ID = "mision-seguridad-digital-videojuegos";
-const SCHEMA_VERSION = 1;
+const CAMPAIGN_TYPE = "gaming-awareness";
+const CAMPAIGN_LOCATION = {
+  label: "ITLA Caleta · Sede Central",
+  city: "Boca Chica",
+  province: "Santo Domingo",
+  country: "República Dominicana",
+  latitude: 18.451,
+  longitude: -69.665,
+  source: "campaign"
+};
+const SCHEMA_VERSION = 2;
 const sessionId = crypto.randomUUID ? crypto.randomUUID() : `caa-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const startedAtMs = Date.now();
 let authUser = null;
@@ -20,6 +30,7 @@ let db = null;
 let lastScreen = null;
 let selectedGame = null;
 let sessionReady = false;
+let locationData = { ...CAMPAIGN_LOCATION };
 
 function getDeviceType() {
   const ua = navigator.userAgent || "";
@@ -38,26 +49,72 @@ function getBrowser() {
   return "Other";
 }
 
-function baseEvent(eventType, eventValue = null, screen = null) {
+function getOS() {
+  const ua = navigator.userAgent || "";
+  if (/windows nt 10/i.test(ua)) return "Windows";
+  if (/android/i.test(ua)) return "Android";
+  if (/iphone|ipad|ipod/i.test(ua)) return "iOS";
+  if (/mac os x/i.test(ua)) return "macOS";
+  if (/linux/i.test(ua)) return "Linux";
+  return "Other";
+}
+
+async function resolveLocationWithoutPrompt() {
+  if (!navigator.geolocation || !navigator.permissions) return;
+  try {
+    const permission = await navigator.permissions.query({ name: "geolocation" });
+    if (permission.state !== "granted") return;
+    navigator.geolocation.getCurrentPosition((position) => {
+      locationData = {
+        label: "Ubicación aproximada autorizada",
+        city: CAMPAIGN_LOCATION.city,
+        province: CAMPAIGN_LOCATION.province,
+        country: CAMPAIGN_LOCATION.country,
+        latitude: Number(position.coords.latitude.toFixed(3)),
+        longitude: Number(position.coords.longitude.toFixed(3)),
+        accuracyMeters: Math.round(position.coords.accuracy || 0),
+        source: "device-permission"
+      };
+      updateSession({ location: locationData });
+      track("location_enriched", locationData.source, lastScreen || "start-screen");
+    }, () => {}, { enableHighAccuracy: false, maximumAge: 600000, timeout: 2500 });
+  } catch (_) {}
+}
+
+function environment() {
+  return {
+    deviceType: getDeviceType(),
+    browser: getBrowser(),
+    os: getOS(),
+    language: navigator.language || "unknown",
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown",
+    viewport: `${window.innerWidth}x${window.innerHeight}`,
+    screenResolution: `${screen.width}x${screen.height}`,
+    online: navigator.onLine,
+    location: locationData
+  };
+}
+
+function baseEvent(eventType, eventValue = null, screenName = null) {
   return {
     sessionUid: authUser?.uid || null,
     sessionId,
     campaignId: CAMPAIGN_ID,
+    campaignType: CAMPAIGN_TYPE,
     eventType,
     eventValue,
-    screen,
-    deviceType: getDeviceType(),
-    browser: getBrowser(),
+    screen: screenName,
+    ...environment(),
     createdAt: serverTimestamp(),
     elapsedMs: Date.now() - startedAtMs,
     schemaVersion: SCHEMA_VERSION
   };
 }
 
-async function track(eventType, eventValue = null, screen = null) {
+async function track(eventType, eventValue = null, screenName = null) {
   if (!db || !authUser) return;
   try {
-    await addDoc(collection(db, "events"), baseEvent(eventType, eventValue, screen));
+    await addDoc(collection(db, "events"), baseEvent(eventType, eventValue, screenName));
   } catch (error) {
     console.warn("CAA telemetry event not recorded:", error?.code || error);
   }
@@ -69,18 +126,18 @@ async function createSession() {
     sessionUid: authUser.uid,
     sessionId,
     campaignId: CAMPAIGN_ID,
+    campaignType: CAMPAIGN_TYPE,
     startedAt: serverTimestamp(),
     lastSeenAt: serverTimestamp(),
     status: "active",
     selectedGame: null,
     currentScreen: "start-screen",
-    deviceType: getDeviceType(),
-    browser: getBrowser(),
-    language: navigator.language || "unknown",
+    ...environment(),
     schemaVersion: SCHEMA_VERSION
   });
   sessionReady = true;
   await track("session_started", null, "start-screen");
+  resolveLocationWithoutPrompt();
 }
 
 async function updateSession(fields) {
@@ -90,6 +147,7 @@ async function updateSession(fields) {
       sessionUid: authUser.uid,
       sessionId,
       campaignId: CAMPAIGN_ID,
+      campaignType: CAMPAIGN_TYPE,
       lastSeenAt: serverTimestamp(),
       ...fields
     }, { merge: true });
@@ -137,12 +195,12 @@ function bindExperienceEvents() {
     await updateSession({
       currentScreen: active.id,
       status: active.id === "final-screen" ? "completed" : "in_progress",
-      ...(active.id === "final-screen" ? { completedAt: serverTimestamp() } : {})
+      ...(active.id === "final-screen" ? { completedAt: serverTimestamp(), durationMs: Date.now() - startedAtMs } : {})
     });
   });
 
-  document.querySelectorAll(".screen").forEach((screen) => {
-    observer.observe(screen, { attributes: true, attributeFilter: ["class"] });
+  document.querySelectorAll(".screen").forEach((screenElement) => {
+    observer.observe(screenElement, { attributes: true, attributeFilter: ["class"] });
   });
 }
 
@@ -169,5 +227,8 @@ document.addEventListener("visibilitychange", () => {
     updateSession({ status: "active", currentScreen: lastScreen || "start-screen" });
   }
 });
+
+window.addEventListener("online", () => track("connectivity_restored", null, lastScreen || "start-screen"));
+window.addEventListener("offline", () => track("connectivity_lost", null, lastScreen || "start-screen"));
 
 initializeCAA();
