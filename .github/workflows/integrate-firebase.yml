@@ -1,0 +1,49 @@
+name: Integrate Firebase telemetry
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/integrate-firebase.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Add Firebase telemetry module to index
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('index.html')
+          html = path.read_text(encoding='utf-8')
+          tag = '<script type="module" src="./firebase-telemetry.js"></script>'
+
+          if tag not in html:
+              if '</body>' not in html:
+                  raise SystemExit('No se encontró </body> en index.html')
+              html = html.replace('</body>', f'{tag}\n</body>', 1)
+              path.write_text(html, encoding='utf-8')
+              print('Firebase telemetry inserted into index.html')
+          else:
+              print('Firebase telemetry was already integrated')
+          PY
+
+      - name: Commit integration
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "No changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Connect index.html to Firebase CAA telemetry"
+          git push
