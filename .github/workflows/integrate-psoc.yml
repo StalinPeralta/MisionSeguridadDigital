@@ -1,0 +1,30 @@
+name: Integrate PSOC into CAA SOC
+on:
+  push:
+    paths:
+      - '.github/workflows/integrate-psoc.yml'
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add PSOC integration module
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('caa-admin.html')
+          text = path.read_text(encoding='utf-8')
+          tag = '<script type="module" src="./psoc-caa-integration.js"></script>'
+          if tag not in text:
+              text = text.replace('</body>', tag + '</body>')
+              path.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add caa-admin.html
+          git diff --cached --quiet || git commit -m "Integrate PSOC into CAA SOC"
+          git push
