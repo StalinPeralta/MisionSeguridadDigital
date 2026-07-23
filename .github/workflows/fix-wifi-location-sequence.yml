@@ -1,0 +1,40 @@
+name: Fix WiFi location sequence
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-wifi-location-sequence.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch WiFi UX sequence
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          wifi = Path('wifi.html')
+          text = wifi.read_text(encoding='utf-8')
+          old = "$('connectBtn').onclick=async()=>{let btn=$('connectBtn'),text=$('connectText'),bar=$('connectBar');btn.disabled=true;emit('wifi_connect_attempt','Visitantes 5G');const states=[['Conectando…',22],['Obteniendo dirección IP…',48],['Comprobando calidad de Internet…',71],['Abriendo portal de acceso…',100]];"
+          new = "$('connectBtn').onclick=async()=>{let btn=$('connectBtn'),text=$('connectText'),bar=$('connectBar');btn.disabled=true;text.textContent='Esperando autorización de ubicación…';bar.style.width='8%';emit('wifi_location_request','Visitantes 5G');await new Promise(resolve=>{let done=false;const finish=()=>{if(done)return;done=true;removeEventListener('caa-wifi-location-ready',finish);clearTimeout(timer);resolve()};addEventListener('caa-wifi-location-ready',finish,{once:true});const timer=setTimeout(finish,7000)});text.textContent='Preparando conexión…';bar.style.width='12%';await new Promise(r=>setTimeout(r,350));emit('wifi_connect_attempt','Visitantes 5G');const states=[['Conectando…',22],['Obteniendo dirección IP…',48],['Comprobando calidad de Internet…',71],['Abriendo portal de acceso…',100]];"
+          if old not in text:
+              raise SystemExit('wifi.html target not found')
+          wifi.write_text(text.replace(old,new,1), encoding='utf-8')
+
+          telemetry = Path('wifi-telemetry.js')
+          t = telemetry.read_text(encoding='utf-8')
+          old2 = "addEventListener('caa-wifi',async e=>{const{type,value}=e.detail||{};if(type==='wifi_connect_attempt'){await requestLocation();await update({status:'in_progress',selectedNetwork:value,currentScreen:'wifi-validation'})}if(type==='locked_network_clicked')"
+          new2 = "addEventListener('caa-wifi',async e=>{const{type,value}=e.detail||{};if(type==='wifi_location_request'){await requestLocation();dispatchEvent(new CustomEvent('caa-wifi-location-ready'));return}if(type==='wifi_connect_attempt'){await update({status:'in_progress',selectedNetwork:value,currentScreen:'wifi-validation'})}if(type==='locked_network_clicked')"
+          if old2 not in t:
+              raise SystemExit('wifi-telemetry.js target not found')
+          telemetry.write_text(t.replace(old2,new2,1), encoding='utf-8')
+          PY
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add wifi.html wifi-telemetry.js
+          git commit -m "Pause WiFi simulation until location permission resolves"
+          git push
