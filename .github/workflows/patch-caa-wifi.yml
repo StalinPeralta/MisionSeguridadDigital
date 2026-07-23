@@ -1,0 +1,40 @@
+name: Patch CAA WiFi integration
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/patch-caa-wifi.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch CAA SOC
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('caa-admin.html')
+          s = p.read_text(encoding='utf-8')
+          old_nav = '<button class="nav-item" data-view="settings">⚙ CONFIGURACIÓN</button>'
+          new_nav = '<button class="nav-item" data-view="settings">⚙ CONFIGURACIÓN</button><button class="nav-item" type="button" onclick="window.location.href=\'./wifi-admin.html\'">📶 WIFI OPERATIONS</button>'
+          if old_nav in s and 'WIFI OPERATIONS</button>' not in s:
+              s = s.replace(old_nav, new_nav, 1)
+          old_settings = '<div class="module"><h4>PRÓXIMO MÓDULO</h4><small>Telemetría WiFi</small><div class="module-value" style="font-size:18px;color:var(--yellow)">PREPARADO</div></div>'
+          new_settings = '<div class="module" role="button" tabindex="0" onclick="window.location.href=\'./wifi-admin.html\'" onkeydown="if(event.key===\'Enter\'||event.key===\' \')window.location.href=\'./wifi-admin.html\'" style="cursor:pointer;border-color:rgba(20,241,149,.38);box-shadow:0 0 22px rgba(20,241,149,.08)"><h4>MÓDULO WIFI</h4><small>Telemetría WiFi · Abrir operaciones</small><div class="module-value" style="font-size:18px;color:var(--green)">OPERATIVO</div></div>'
+          if old_settings in s:
+              s = s.replace(old_settings, new_settings, 1)
+          old_render = '$("threat-modules").innerHTML=`<div class="module"><div>🎮</div><h4>VIDEOJUEGOS</h4><small>Campaña activa</small><div class="module-value">${total}</div></div><div class="module"><div>📶</div><h4>WIFI VISITANTES</h4><small>Módulo preparado</small><div class="module-value" style="color:var(--yellow)">0</div></div><div class="module"><div>🎣</div><h4>PHISHING</h4><small>Próxima campaña</small><div class="module-value" style="color:var(--muted)">0</div></div>`;$("red-modules").innerHTML=$("threat-modules").innerHTML;renderMap()}'
+          new_render = 'const wifiSessions=sessions.filter(s=>s.campaignId==="mision-seguridad-digital-wifi"),gamingSessions=sessions.filter(s=>s.campaignId!=="mision-seguridad-digital-wifi"),wifiCompleted=wifiSessions.filter(s=>has(s.id,"wifi_simulation_completed")||s.status==="completed").length;$("threat-modules").innerHTML=`<div class="module"><div>🎮</div><h4>VIDEOJUEGOS</h4><small>Campaña activa</small><div class="module-value">${gamingSessions.length}</div></div><div class="module" role="button" tabindex="0" onclick="window.location.href=\'./wifi-admin.html\'" style="cursor:pointer;border-color:rgba(20,241,149,.34)"><div>📶</div><h4>WIFI VISITANTES</h4><small>Operativo · ${wifiCompleted} completaron</small><div class="module-value" style="color:var(--green)">${wifiSessions.length}</div></div><div class="module"><div>🎣</div><h4>PHISHING</h4><small>Próxima campaña</small><div class="module-value" style="color:var(--muted)">0</div></div>`;$("red-modules").innerHTML=$("threat-modules").innerHTML;renderMap()}'
+          if old_render not in s:
+              raise SystemExit('No se encontró el bloque de indicadores para actualizar')
+          s = s.replace(old_render, new_render, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add caa-admin.html
+          git commit -m "Activate WiFi module and sync CAA threat indicators" || exit 0
+          git push
