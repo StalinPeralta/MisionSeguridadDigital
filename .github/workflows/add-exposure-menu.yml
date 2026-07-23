@@ -1,0 +1,31 @@
+name: Add Exposure Profiles Menu
+on:
+  push:
+    paths:
+      - '.github/exposure-menu-trigger.txt'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add menu entry safely
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('caa-admin.html')
+          s=p.read_text(encoding='utf-8')
+          marker='HUMAN EXPOSURE'
+          if marker not in s:
+              button='<button class="nav-item" type="button" onclick="window.location.href=\'./exposure-profiles.html\'">◎ HUMAN EXPOSURE</button>'
+              s=s.replace('</nav>',button+'</nav>',1)
+              p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit change
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add caa-admin.html
+          git diff --cached --quiet || git commit -m "Add exposure profiles access to CAA SOC"
+          git push
