@@ -22,15 +22,17 @@ const CAMPAIGN_LOCATION = {
   longitude: -69.665,
   source: "campaign"
 };
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const sessionId = crypto.randomUUID ? crypto.randomUUID() : `caa-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const startedAtMs = Date.now();
 let authUser = null;
 let db = null;
-let lastScreen = null;
+let lastScreen = "start-screen";
 let selectedGame = null;
 let sessionReady = false;
 let locationData = { ...CAMPAIGN_LOCATION };
+let locationRequested = false;
+let locationPromise = null;
 
 function getDeviceType() {
   const ua = navigator.userAgent || "";
@@ -59,26 +61,18 @@ function getOS() {
   return "Other";
 }
 
-async function resolveLocationWithoutPrompt() {
-  if (!navigator.geolocation || !navigator.permissions) return;
-  try {
-    const permission = await navigator.permissions.query({ name: "geolocation" });
-    if (permission.state !== "granted") return;
-    navigator.geolocation.getCurrentPosition((position) => {
-      locationData = {
-        label: "Ubicación aproximada autorizada",
-        city: CAMPAIGN_LOCATION.city,
-        province: CAMPAIGN_LOCATION.province,
-        country: CAMPAIGN_LOCATION.country,
-        latitude: Number(position.coords.latitude.toFixed(3)),
-        longitude: Number(position.coords.longitude.toFixed(3)),
-        accuracyMeters: Math.round(position.coords.accuracy || 0),
-        source: "device-permission"
-      };
-      updateSession({ location: locationData });
-      track("location_enriched", locationData.source, lastScreen || "start-screen");
-    }, () => {}, { enableHighAccuracy: false, maximumAge: 600000, timeout: 2500 });
-  } catch (_) {}
+function locationFields() {
+  return {
+    location: locationData,
+    locationLabel: locationData.label || "Ubicación aproximada",
+    city: locationData.city || null,
+    province: locationData.province || null,
+    country: locationData.country || "República Dominicana",
+    latitude: Number(locationData.latitude),
+    longitude: Number(locationData.longitude),
+    locationSource: locationData.source || "campaign",
+    locationAccuracyMeters: locationData.accuracyMeters || null
+  };
 }
 
 function environment() {
@@ -91,53 +85,8 @@ function environment() {
     viewport: `${window.innerWidth}x${window.innerHeight}`,
     screenResolution: `${screen.width}x${screen.height}`,
     online: navigator.onLine,
-    location: locationData
+    ...locationFields()
   };
-}
-
-function baseEvent(eventType, eventValue = null, screenName = null) {
-  return {
-    sessionUid: authUser?.uid || null,
-    sessionId,
-    campaignId: CAMPAIGN_ID,
-    campaignType: CAMPAIGN_TYPE,
-    eventType,
-    eventValue,
-    screen: screenName,
-    ...environment(),
-    createdAt: serverTimestamp(),
-    elapsedMs: Date.now() - startedAtMs,
-    schemaVersion: SCHEMA_VERSION
-  };
-}
-
-async function track(eventType, eventValue = null, screenName = null) {
-  if (!db || !authUser) return;
-  try {
-    await addDoc(collection(db, "events"), baseEvent(eventType, eventValue, screenName));
-  } catch (error) {
-    console.warn("CAA telemetry event not recorded:", error?.code || error);
-  }
-}
-
-async function createSession() {
-  if (!db || !authUser || sessionReady) return;
-  await setDoc(doc(db, "sessions", sessionId), {
-    sessionUid: authUser.uid,
-    sessionId,
-    campaignId: CAMPAIGN_ID,
-    campaignType: CAMPAIGN_TYPE,
-    startedAt: serverTimestamp(),
-    lastSeenAt: serverTimestamp(),
-    status: "active",
-    selectedGame: null,
-    currentScreen: "start-screen",
-    ...environment(),
-    schemaVersion: SCHEMA_VERSION
-  });
-  sessionReady = true;
-  await track("session_started", null, "start-screen");
-  resolveLocationWithoutPrompt();
 }
 
 async function updateSession(fields) {
@@ -156,10 +105,125 @@ async function updateSession(fields) {
   }
 }
 
+function requestApproximateLocation({ prompt = false } = {}) {
+  if (!navigator.geolocation) return Promise.resolve(locationData);
+  if (locationPromise) return locationPromise;
+
+  locationPromise = new Promise(async (resolve) => {
+    try {
+      if (!prompt && navigator.permissions) {
+        const permission = await navigator.permissions.query({ name: "geolocation" });
+        if (permission.state !== "granted") {
+          locationPromise = null;
+          resolve(locationData);
+          return;
+        }
+      }
+
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        locationData = {
+          label: "Ubicación aproximada autorizada",
+          city: null,
+          province: "Santo Domingo",
+          country: "República Dominicana",
+          latitude: Number(position.coords.latitude.toFixed(4)),
+          longitude: Number(position.coords.longitude.toFixed(4)),
+          accuracyMeters: Math.round(position.coords.accuracy || 0),
+          source: "device-permission"
+        };
+        await updateSession({
+          ...locationFields(),
+          lastEventType: "location_enriched",
+          lastEventAt: serverTimestamp()
+        });
+        await track("location_enriched", locationData.source, lastScreen, { skipLocationRequest: true });
+        resolve(locationData);
+      }, () => {
+        locationPromise = null;
+        resolve(locationData);
+      }, {
+        enableHighAccuracy: false,
+        maximumAge: 300000,
+        timeout: 7000
+      });
+    } catch (_) {
+      locationPromise = null;
+      resolve(locationData);
+    }
+  });
+
+  return locationPromise;
+}
+
+function baseEvent(eventType, eventValue = null, screenName = null) {
+  return {
+    sessionUid: authUser?.uid || null,
+    sessionId,
+    campaignId: CAMPAIGN_ID,
+    campaignType: CAMPAIGN_TYPE,
+    eventType,
+    eventValue,
+    screen: screenName,
+    ...environment(),
+    createdAt: serverTimestamp(),
+    elapsedMs: Date.now() - startedAtMs,
+    schemaVersion: SCHEMA_VERSION
+  };
+}
+
+async function track(eventType, eventValue = null, screenName = null, options = {}) {
+  if (!db || !authUser) return;
+  try {
+    const eventDocument = baseEvent(eventType, eventValue, screenName);
+    await addDoc(collection(db, "events"), eventDocument);
+    if (sessionReady) {
+      await updateSession({
+        ...locationFields(),
+        lastEventType: eventType,
+        lastEventValue: eventValue,
+        lastEventScreen: screenName,
+        lastEventAt: serverTimestamp()
+      });
+    }
+  } catch (error) {
+    console.warn("CAA telemetry event not recorded:", error?.code || error);
+  }
+}
+
+async function createSession() {
+  if (!db || !authUser || sessionReady) return;
+  await setDoc(doc(db, "sessions", sessionId), {
+    sessionUid: authUser.uid,
+    sessionId,
+    campaignId: CAMPAIGN_ID,
+    campaignType: CAMPAIGN_TYPE,
+    startedAt: serverTimestamp(),
+    lastSeenAt: serverTimestamp(),
+    status: "active",
+    selectedGame: null,
+    currentScreen: "start-screen",
+    lastEventType: "session_started",
+    ...environment(),
+    schemaVersion: SCHEMA_VERSION
+  });
+  sessionReady = true;
+  await track("session_started", null, "start-screen");
+  requestApproximateLocation({ prompt: false });
+}
+
+function requestLocationFromUserGesture() {
+  if (locationRequested) return;
+  locationRequested = true;
+  requestApproximateLocation({ prompt: true });
+}
+
 function bindExperienceEvents() {
   document.querySelectorAll(".game").forEach((game) => {
     game.addEventListener("click", async () => {
-      const label = (game.textContent || "").replace(/EN ESPERA|ANALIZANDO\.\.\.|ANALIZANDO COMPATIBILIDAD\.\.\.|✓ COMPATIBLE/g, "").trim();
+      requestLocationFromUserGesture();
+      const label = (game.textContent || "")
+        .replace(/EN ESPERA|ANALIZANDO\.\.\.|ANALIZANDO COMPATIBILIDAD\.\.\.|✓ COMPATIBLE/g, "")
+        .trim();
       selectedGame = label || "unknown";
       await track("game_selected", selectedGame, "start-screen");
       await updateSession({ selectedGame });
@@ -167,6 +231,7 @@ function bindExperienceEvents() {
   });
 
   document.getElementById("continue-btn")?.addEventListener("click", async () => {
+    requestLocationFromUserGesture();
     await track("continue_clicked", selectedGame, "start-screen");
     await updateSession({ status: "in_progress" });
   }, { capture: true });
@@ -195,7 +260,9 @@ function bindExperienceEvents() {
     await updateSession({
       currentScreen: active.id,
       status: active.id === "final-screen" ? "completed" : "in_progress",
-      ...(active.id === "final-screen" ? { completedAt: serverTimestamp(), durationMs: Date.now() - startedAtMs } : {})
+      ...(active.id === "final-screen"
+        ? { completedAt: serverTimestamp(), durationMs: Date.now() - startedAtMs }
+        : {})
     });
   });
 
