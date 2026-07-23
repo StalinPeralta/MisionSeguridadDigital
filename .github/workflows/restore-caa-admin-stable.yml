@@ -1,0 +1,34 @@
+name: Restore stable CAA Admin
+
+on:
+  push:
+    paths:
+      - '.github/workflows/restore-caa-admin-stable.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore last stable CAA SOC
+        run: |
+          git show ad9acac5ad794a33375e75c6cf77c9d7a14915e6:caa-admin.html > caa-admin.html
+
+      - name: Commit restored file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add caa-admin.html
+          if git diff --cached --quiet; then
+            echo "No changes required"
+          else
+            git commit -m "Restore stable CAA SOC login and dashboard"
+            git push
+          fi
