@@ -1,0 +1,70 @@
+name: Patch Active Sessions UX
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[active-sessions-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch active sessions panel
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('caa-admin.html')
+          text = path.read_text(encoding='utf-8')
+          marker = '/* ACTIVE_SESSIONS_UX_V1 */'
+
+          css = r'''
+          /* ACTIVE_SESSIONS_UX_V1 */
+          #active-sessions{height:650px;overflow-y:auto;overflow-x:hidden;padding-right:7px;scrollbar-width:thin;scrollbar-color:rgba(0,217,255,.55) rgba(3,16,31,.75)}
+          #active-sessions::-webkit-scrollbar{width:8px}
+          #active-sessions::-webkit-scrollbar-track{background:rgba(3,16,31,.75);border-radius:999px}
+          #active-sessions::-webkit-scrollbar-thumb{background:linear-gradient(var(--blue),var(--cyan));border-radius:999px;border:2px solid #03101f}
+          .active-session-card{position:relative;display:grid;grid-template-columns:12px 1fr auto;gap:12px;align-items:center;min-height:96px;margin-bottom:8px;padding:13px 14px;border:1px solid rgba(23,152,255,.22);border-left:3px solid var(--cyan);border-radius:12px;background:linear-gradient(90deg,rgba(7,25,42,.92),rgba(4,15,29,.72));transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+          .active-session-card:hover{transform:translateX(3px);border-color:rgba(0,217,255,.5);box-shadow:0 0 22px rgba(0,217,255,.08)}
+          .active-session-pulse{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 14px var(--green);animation:blink 1.2s infinite}
+          .active-session-id{font:900 13px "Courier New",monospace;color:#e8f7ff;letter-spacing:.4px}
+          .active-session-game{margin-top:5px;font-size:12px;font-weight:850;color:var(--cyan)}
+          .active-session-meta{display:flex;flex-wrap:wrap;gap:7px 12px;margin-top:7px;color:#7f98af;font-size:10px}
+          .active-session-meta span{display:inline-flex;align-items:center;gap:4px}
+          .active-session-side{text-align:right;align-self:stretch;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end}
+          .active-session-status{display:inline-flex;align-items:center;gap:6px;padding:4px 7px;border:1px solid rgba(20,241,149,.38);border-radius:999px;color:var(--green);font:900 9px "Courier New",monospace;background:rgba(20,241,149,.06)}
+          .active-session-age{color:#7890aa;font:700 9px "Courier New",monospace;white-space:nowrap}
+          @media(max-width:950px){#active-sessions{height:480px}.active-session-card{grid-template-columns:10px 1fr}.active-session-side{grid-column:2;flex-direction:row;align-items:center}.active-session-meta{gap:5px 9px}}
+          '''
+
+          if marker not in text:
+              text = text.replace('</style>', css + '\n</style>', 1)
+
+          replacement = r'''$("active-sessions").innerHTML=sessions.filter(s=>s.status!=="completed"&&s.status!=="inactive").sort((a,b)=>(b.lastEventAt?.seconds||b.lastSeenAt?.seconds||b.startedAt?.seconds||0)-(a.lastEventAt?.seconds||a.lastSeenAt?.seconds||a.startedAt?.seconds||0)).map(s=>{const stamp=s.lastEventAt||s.lastSeenAt||s.startedAt;const last=stamp?.toDate?stamp.toDate():stamp?new Date(stamp):null;const diff=last?Math.max(0,Date.now()-last.getTime()):0;const age=diff<60000?`Hace ${Math.max(1,Math.floor(diff/1000))} s`:diff<3600000?`Hace ${Math.floor(diff/60000)} min`:`Hace ${Math.floor(diff/3600000)} h`;const game=s.game||s.selectedGame||"Sin selección";const location=s.locationLabel||s.city||s.province||"Sin ubicación";return`<article class="active-session-card"><span class="active-session-pulse" aria-hidden="true"></span><div><div class="active-session-id">${esc((s.id||s.sessionId||"").slice(0,12))}</div><div class="active-session-game">🎮 ${esc(game)}</div><div class="active-session-meta"><span>🖥 ${esc(s.deviceType||"--")}</span><span>🌐 ${esc(s.browser||"--")}</span><span>📍 ${esc(location)}</span></div></div><div class="active-session-side"><span class="active-session-status">● ACTIVA</span><span class="active-session-age">${age}</span></div></article>`}).join("")||'<div class="empty">No hay sesiones activas.</div>';txt("blue-events"'''
+
+          pattern = re.compile(r'\$\("active-sessions"\)\.innerHTML=.*?;txt\("blue-events"', re.S)
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit('No se encontró el bloque active-sessions esperado; no se modificó el archivo.')
+
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit patched dashboard
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add caa-admin.html
+          git commit -m "Improve active sessions UX [active-sessions-patched]"
+          git push
