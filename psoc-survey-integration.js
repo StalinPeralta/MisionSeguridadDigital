@@ -44,6 +44,16 @@
       if (attackerView) nav.insertBefore(button, attackerView);
       else nav.appendChild(button);
     });
+
+    if (!nav.querySelector('[data-cyber-journey-link]')) {
+      const journey = document.createElement('button');
+      journey.type = 'button';
+      journey.setAttribute('data-cyber-journey-link', 'true');
+      journey.textContent = '🏅 CYBER JOURNEY';
+      journey.addEventListener('click', () => { location.href = './cyber-journey.html'; });
+      if (attackerView) nav.insertBefore(journey, attackerView);
+      else nav.appendChild(journey);
+    }
   }
 
   function addSpecialTemplates() {
@@ -111,4 +121,4 @@
   setTimeout(init, 500);
   setTimeout(init, 1500);
 })();
-// PSOC Special Campaign Templates v1.1.0
+// PSOC Special Campaign Templates + Cyber Journey v1.2.0
