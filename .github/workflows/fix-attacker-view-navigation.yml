@@ -1,0 +1,53 @@
+name: Fix Attacker View Navigation
+on:
+  push:
+    paths:
+      - '.github/triggers/fix-attacker-view-navigation.txt'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch navigation labels and links
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # CAA SOC: rename the legacy menu label.
+          p = Path('caa-admin.html')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace('HUMAN EXPOSURE', "ATTACKER'S VIEW · SOCIAL ENGINEERING")
+          p.write_text(text, encoding='utf-8')
+
+          # WiFi SOC: add direct access beside the return link.
+          p = Path('wifi-admin.html')
+          text = p.read_text(encoding='utf-8')
+          if 'attackers-view-wifi.html' not in text:
+              old = '<a class="link" href="./caa-admin.html#settings">VOLVER AL CAA SOC</a>'
+              new = '<a class="link" href="./attackers-view-wifi.html">ATTACKER\'S VIEW · WIFI</a> &nbsp; <a class="link" href="./caa-admin.html#settings">VOLVER AL CAA SOC</a>'
+              if old not in text:
+                  raise SystemExit('WiFi navigation anchor not found')
+              text = text.replace(old, new, 1)
+          p.write_text(text, encoding='utf-8')
+
+          # PSOC: add a direct launcher for the safe Head Hunter scenario.
+          p = Path('phishing-admin.html')
+          text = p.read_text(encoding='utf-8')
+          if 'phishing-headhunter.html' not in text:
+              old = '<button onclick="location.href=\'./phishing.html\'">▶ ABRIR SIMULACIÓN</button>'
+              new = old + '<button onclick="location.href=\'./phishing-headhunter.html\'">💼 HEAD HUNTER DEMO</button>'
+              if old not in text:
+                  raise SystemExit('PSOC simulation button not found')
+              text = text.replace(old, new, 1)
+          p.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit patches
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add caa-admin.html wifi-admin.html phishing-admin.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix Attacker's View navigation and add Head Hunter launcher"
+          git push
