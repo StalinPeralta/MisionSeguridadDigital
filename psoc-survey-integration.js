@@ -85,3 +85,4 @@
   setTimeout(init, 500);
   setTimeout(init, 1500);
 })();
+// PSOC Survey Integration v1.0.1
