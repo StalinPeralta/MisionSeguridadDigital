@@ -1,0 +1,56 @@
+name: Patch Attacker's View Integration
+on:
+  push:
+    paths:
+      - '.attackers-view-trigger'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply safe UI integrations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # Rename social exposure module branding without changing its logic.
+          p=Path('exposure-profiles.html')
+          s=p.read_text(encoding='utf-8')
+          replacements={
+            'Perfiles de Exposición | CAA SOC': "Attacker's View · Social Engineering | CAA SOC",
+            'PERFILES DE EXPOSICIÓN': "ATTACKER'S VIEW · SOCIAL ENGINEERING",
+            'CAA SOC · EDUCATIONAL INTELLIGENCE': "ATTACKER'S VIEW · SOCIAL ENGINEERING",
+            'CAA SOC · Inteligencia educativa en tiempo real': 'Understanding How Criminals Think · Inteligencia educativa en tiempo real',
+            'Visualización pseudónima de cómo pequeñas decisiones construyen un perfil útil para la ingeniería social.': 'Así es como un atacante comienza a conocerte mediante pequeñas decisiones y señales aparentemente inocentes.'
+          }
+          for a,b in replacements.items(): s=s.replace(a,b)
+          p.write_text(s,encoding='utf-8')
+
+          # Add direct Attacker's View button to WiFi SOC.
+          p=Path('wifi-admin.html')
+          s=p.read_text(encoding='utf-8')
+          if 'attackers-view-wifi.html' not in s:
+            anchor="</nav>"
+            button="<button class=\"nav-item\" type=\"button\" onclick=\"window.location.href='./attackers-view-wifi.html'\">◉ ATTACKER'S VIEW</button>"
+            s=s.replace(anchor,button+anchor,1)
+          p.write_text(s,encoding='utf-8')
+
+          # Add direct Attacker's View button to PSOC.
+          p=Path('phishing-admin.html')
+          s=p.read_text(encoding='utf-8')
+          if 'attackers-view-phishing.html' not in s:
+            anchor="</nav>"
+            button="<button class=\"nav-item\" type=\"button\" onclick=\"window.location.href='./attackers-view-phishing.html'\">◉ ATTACKER'S VIEW</button>"
+            if anchor in s: s=s.replace(anchor,button+anchor,1)
+            else: s=s.replace('</aside>',button+'</aside>',1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit changes
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add exposure-profiles.html wifi-admin.html phishing-admin.html
+          git diff --cached --quiet || git commit -m "Integrate Attacker's View across Social, WiFi and Phishing"
+          git push
