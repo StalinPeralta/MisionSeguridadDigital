@@ -1,24 +1,22 @@
 (() => {
   'use strict';
 
-  const SURVEY_VALUE = 'survey-phishing';
-  const SURVEY_LABEL = 'Encuesta de Perfil — Survey Phishing';
-  const SURVEY_PAGE = 'phishing-survey.html';
-
-  function addMenuButton() {
-    const nav = document.querySelector('.sidebar .nav, nav.nav');
-    if (!nav || nav.querySelector('[data-survey-phishing-link]')) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.dataset.surveyPhishingLink = 'true';
-    button.textContent = '▤ ENCUESTA PHISHING';
-    button.addEventListener('click', () => {
-      location.href = `./${SURVEY_PAGE}?campaign=PH-2026-SURVEY&template=${SURVEY_VALUE}`;
-    });
-    const attackerView = Array.from(nav.querySelectorAll('button')).find(b => /ATTACKER.?S VIEW/i.test(b.textContent));
-    if (attackerView) nav.insertBefore(button, attackerView);
-    else nav.appendChild(button);
-  }
+  const SPECIAL_TEMPLATES = {
+    'survey-phishing': {
+      label: 'Encuesta de Perfil — Survey Phishing',
+      page: 'phishing-survey.html',
+      campaign: 'PH-2026-SURVEY',
+      menuText: '▤ ENCUESTA PHISHING',
+      menuAttribute: 'data-survey-phishing-link'
+    },
+    'headhunter-demo': {
+      label: 'Head Hunter Demo — Recursos Humanos',
+      page: 'phishing-headhunter.html',
+      campaign: 'PH-2026-HEADHUNTER',
+      menuText: '▣ HEAD HUNTER DEMO',
+      menuAttribute: 'data-headhunter-phishing-link'
+    }
+  };
 
   function findTemplateSelect() {
     const selects = Array.from(document.querySelectorAll('select'));
@@ -29,40 +27,68 @@
     });
   }
 
-  function addSurveyTemplate() {
+  function addMenuButtons() {
+    const nav = document.querySelector('.sidebar .nav, nav.nav');
+    if (!nav) return;
+    const attackerView = Array.from(nav.querySelectorAll('button')).find(b => /ATTACKER.?S VIEW/i.test(b.textContent));
+
+    Object.entries(SPECIAL_TEMPLATES).forEach(([value, config]) => {
+      if (nav.querySelector(`[${config.menuAttribute}]`)) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.setAttribute(config.menuAttribute, 'true');
+      button.textContent = config.menuText;
+      button.addEventListener('click', () => {
+        location.href = `./${config.page}?campaign=${encodeURIComponent(config.campaign)}&template=${encodeURIComponent(value)}`;
+      });
+      if (attackerView) nav.insertBefore(button, attackerView);
+      else nav.appendChild(button);
+    });
+  }
+
+  function addSpecialTemplates() {
     const select = findTemplateSelect();
-    if (!select || Array.from(select.options).some(o => o.value === SURVEY_VALUE)) return select;
-    const option = document.createElement('option');
-    option.value = SURVEY_VALUE;
-    option.textContent = SURVEY_LABEL;
-    select.appendChild(option);
+    if (!select) return null;
+
+    Object.entries(SPECIAL_TEMPLATES).forEach(([value, config]) => {
+      if (Array.from(select.options).some(o => o.value === value)) return;
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = config.label;
+      select.appendChild(option);
+    });
     return select;
   }
 
   function rewriteGeneratedLink() {
     const select = findTemplateSelect();
-    if (!select || select.value !== SURVEY_VALUE) return;
+    const config = select ? SPECIAL_TEMPLATES[select.value] : null;
+    if (!config) return;
+
     document.querySelectorAll('.generated, [id*="generated"], [class*="generated"]').forEach(box => {
       const raw = (box.textContent || '').trim();
       if (!raw || !/https?:\/\//i.test(raw)) return;
       try {
         const url = new URL(raw);
-        url.pathname = url.pathname.replace(/[^/]+$/, SURVEY_PAGE);
-        url.searchParams.set('template', SURVEY_VALUE);
+        url.pathname = url.pathname.replace(/[^/]+$/, config.page);
+        url.searchParams.set('template', select.value);
+        if (!url.searchParams.get('campaign')) url.searchParams.set('campaign', config.campaign);
         box.textContent = url.toString();
       } catch (_) {
-        box.textContent = raw.replace(/phishing(?:-headhunter)?\.html/i, SURVEY_PAGE)
-          .replace(/([?&]template=)[^&]*/i, `$1${SURVEY_VALUE}`);
+        box.textContent = raw
+          .replace(/phishing(?:-headhunter|-survey)?\.html/i, config.page)
+          .replace(/([?&]template=)[^&]*/i, `$1${select.value}`);
       }
     });
   }
 
   function bindBuilder() {
-    const select = addSurveyTemplate();
-    if (select && !select.dataset.surveyBound) {
-      select.dataset.surveyBound = 'true';
+    const select = addSpecialTemplates();
+    if (select && !select.dataset.specialTemplatesBound) {
+      select.dataset.specialTemplatesBound = 'true';
       select.addEventListener('change', () => setTimeout(rewriteGeneratedLink, 0));
     }
+
     document.addEventListener('click', event => {
       const button = event.target.closest('button');
       if (!button) return;
@@ -75,7 +101,7 @@
   }
 
   function init() {
-    addMenuButton();
+    addMenuButtons();
     bindBuilder();
     rewriteGeneratedLink();
   }
@@ -85,4 +111,4 @@
   setTimeout(init, 500);
   setTimeout(init, 1500);
 })();
-// PSOC Survey Integration v1.0.1
+// PSOC Special Campaign Templates v1.1.0
